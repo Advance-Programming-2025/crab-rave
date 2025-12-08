@@ -3,17 +3,6 @@
 version = 4
 
 [[package]]
-name = "One-million-crabs"
-version = "0.1.0"
-dependencies = [
- "common-game",
- "crossbeam-channel",
- "env_logger",
- "flexi_logger",
- "log",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -317,6 +306,17 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "one-million-crabs"
+version = "0.1.0"
+dependencies = [
+ "common-game",
+ "crossbeam-channel",
+ "env_logger",
+ "flexi_logger",
+ "log",
+]
 
 [[package]]
 name = "paste"
