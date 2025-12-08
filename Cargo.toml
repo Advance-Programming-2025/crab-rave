@@ -1,11 +1,11 @@
+[lib]
+name = "one_million_crabs"
+path = "src/lib.rs"
+
 [package]
 name = "one-million-crabs"
 version = "0.1.0"
 edition = "2024"
-
-[lib]
-name = "one_million_crabs"
-path = "src/lib.rs"
 
 [dependencies]
 common-game = { git = "https://github.com/unitn-ap-2025/common.git" }
