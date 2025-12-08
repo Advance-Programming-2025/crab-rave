@@ -270,26 +270,26 @@ impl PlanetAI for AI {
                 }
 
                 let mut ris = None;
-                if let Some(idx) = peek_charged_cell_index() {
+                // if let Some(idx) = peek_charged_cell_index() {
                     payload_ris.insert(
                         "Message".to_string(),
                         "AvailableEnergyCellResponse".to_string(),
                     );
                     payload_ris.insert(String::from("Result"), "EnergyCell available".to_string());
-                    payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
+                    payload_ris.insert(String::from("EnergyCell index"), format!("{}", n_available_cells));
                     ris = Some(PlanetToExplorer::AvailableEnergyCellResponse {
                         available_cells: n_available_cells,
-                    })
-                } else {
-                    payload_ris.insert(
-                        "Response to".to_string(),
-                        "AvailableEnergyCellRequest".to_string(),
-                    );
-                    payload_ris.insert(
-                        String::from("Result"),
-                        "No EnergyCell available".to_string(),
-                    );
-                }
+                    });
+                // } else {
+                //     payload_ris.insert(
+                //         "Response to".to_string(),
+                //         "AvailableEnergyCellRequest".to_string(),
+                //     );
+                //     payload_ris.insert(
+                //         String::from("Result"),
+                //         "No EnergyCell available".to_string(),
+                //     );
+                // }
 
                 //LOG
                 let mut payload = Payload::new();
