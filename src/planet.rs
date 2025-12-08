@@ -1,6 +1,6 @@
 use crossbeam_channel::{Receiver, Sender};
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
-use common_game::components::resource::BasicResourceType::Carbon;
+use common_game::components::resource::BasicResourceType::{Carbon, Hydrogen, Oxygen, Silicon};
 use common_game::components::resource::{
     BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest, ComplexResourceType, Generator, GenericResource
 };
@@ -57,7 +57,7 @@ impl CrabRaveConstructor {
         let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
             PlanetType::D,
             AI::new(),
-            vec![Carbon],
+            vec![Carbon, Hydrogen, Oxygen, Silicon],
             vec![],
             orchestrator_channels,
             explorer_channels,
