@@ -48,6 +48,12 @@ macro_rules! log_msg {
 pub struct CrabRaveConstructor;
 
 impl CrabRaveConstructor {
+
+    /// Constructor for our planet. Returns a Result:
+    /// The planet object if the initialization went well, 
+    /// Err in all other cases. In case of success, the 
+    /// output will be logged to the appropriate channel.
+
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
         id: u32,
@@ -62,6 +68,7 @@ impl CrabRaveConstructor {
             orchestrator_channels,
             explorer_channels,
         );
+
         //LOG
         let mut payload = Payload::new();
         payload.insert(
@@ -69,8 +76,8 @@ impl CrabRaveConstructor {
             gen_rules.iter().map(|x| x.res_to_string() + ", ").collect(),
         );
         payload.insert("Message".to_string(), "New planet created".to_string());
-
         //LOG
+
         let new_planet = Planet::new(
             id,
             planet_type,
@@ -80,6 +87,7 @@ impl CrabRaveConstructor {
             orchestrator_channels,
             explorer_channels,
         )?;
+
         //LOG
         let event = LogEvent::new(
             ActorType::Orchestrator,
@@ -92,6 +100,7 @@ impl CrabRaveConstructor {
         );
         log::info!("{}", event);
         //LOG
+
         Ok(new_planet)
     }
 }
@@ -745,6 +754,15 @@ impl PlanetAI for AI {
         }
     }
 
+    /// Handler used to determine the strategy in case of an incoming asteroid.
+    /// It will usually try to build a rocket if it can and if it has any 
+    /// energy cells available.
+    /// As for our planet, it's a type D, so the planet will ALWAYS die
+    /// when it gets an asteroid. Any other behavior is unexpected and
+    /// should be reported.
+    /// Refer to the common crate documentation for more info on the
+    /// default behavior of this function.
+    
     fn handle_asteroid(
         &mut self,
         state: &mut PlanetState,
@@ -823,6 +841,8 @@ impl PlanetAI for AI {
         //None
     }
 
+    
+
     fn start(&mut self, state: &PlanetState) {
         //println!("Planet {} AI started", state.id());
         let mut payload = Payload::new();
@@ -838,7 +858,7 @@ impl PlanetAI for AI {
         );
         log_msg!(event, RCV_MSG_LOG_CHNL);
     }
-
+    
     fn stop(&mut self, _state: &PlanetState) {
         let mut payload = Payload::new();
         payload.insert("Message".to_string(), "Planet AI stop".to_string());
@@ -854,6 +874,8 @@ impl PlanetAI for AI {
         log_msg!(event, RCV_MSG_LOG_CHNL);
     }
 }
+
+/// This trait is used to generate the "to_string" version of every resource.
 
 pub trait ResToString {
     fn res_to_string(&self) -> String;
@@ -882,13 +904,24 @@ impl ResToString for ComplexResourceType {
     }
 }
 
-pub const N_CELLS: usize = 5; // TODO da cambiare in base al pianeta
+
+
+pub const N_CELLS: usize = 5;
+
+/// Module used to implement an energy cell management system based on a stack.
+/// Provides O(1) lookups, charges and discharges.
+
 pub mod stacks {
     use crate::N_CELLS;
     use std::sync::Mutex;
 
     pub(crate) static FREE_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
     pub(crate) static CHARGED_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
+
+    /// Initializes the internal vectors used to handle the stack.
+    /// MUST be called everytime the planet is created, for example at
+    /// the start of PlanetAI. 
+
     pub fn initialize_free_cell_stack() {
         //initialize the free cell stack with all the possible indexes
         let free_cell_stack = FREE_CELL_STACK.lock();
@@ -919,6 +952,10 @@ pub mod stacks {
         }
     }
 
+    /// Pulls out a free cell from the corresponding stack.
+    /// returns Some and the correspnding index to charge 
+    /// or None if there are no available cells
+
     pub fn get_free_cell_index() -> Option<u32> {
         let free_cell_stack = FREE_CELL_STACK.lock();
         match free_cell_stack {
@@ -930,6 +967,10 @@ pub mod stacks {
         }
     }
 
+    /// Pulls out a charged cell from the corresponding stack.
+    /// returns Some and the correspnding index to discharge 
+    /// or None if there are no available cells
+
     pub fn get_charged_cell_index() -> Option<u32> {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         match charged_cell_stack {
@@ -940,6 +981,12 @@ pub mod stacks {
             }
         }
     }
+
+    /// Pushes a free energy cell back into the stack.
+    /// The user must verify that there is available space,
+    /// as the function will otherwise give no output without
+    /// increasing the available space.
+
     pub fn push_free_cell(index: u32) {
         let free_cell_stack = FREE_CELL_STACK.lock();
         match free_cell_stack {
@@ -953,6 +1000,12 @@ pub mod stacks {
             }
         }
     }
+
+    /// Pushes a free energy cell back into the stack.
+    /// The user must verify that the maximum size hasn't already 
+    /// been reached, as the function will otherwise give 
+    /// no output without increasing the available space.
+
     pub fn push_charged_cell(index: u32) {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         match charged_cell_stack {
@@ -966,6 +1019,11 @@ pub mod stacks {
             }
         }
     }
+
+    /// checks wether there is an available charged cell, 
+    /// without actually consuming the value.
+    /// Returns Some and the corresponding index or
+    /// None if there are no charged cells.  
 
     pub fn peek_charged_cell_index() -> Option<u32> {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
