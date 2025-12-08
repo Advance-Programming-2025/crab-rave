@@ -1,6 +1,6 @@
 use crossbeam_channel::{Receiver, Sender};
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
-use common_game::components::resource::BasicResourceType::Carbon;
+use common_game::components::resource::BasicResourceType::*;
 use common_game::components::resource::{
     BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest, ComplexResourceType, Generator, GenericResource
 };
@@ -15,7 +15,7 @@ use common_game::logging::EventType::{
 use common_game::logging::{ActorType, Channel, EventType, LogEvent, Payload};
 use stacks::{
     get_charged_cell_index, get_free_cell_index, initialize_free_cell_stack,
-    peek_charged_cell_index, push_charged_cell, push_free_cell,
+    push_charged_cell, push_free_cell,
 };
 ///////////////////////////////////////////////////////////////////////////////////////////
 // CrabRave Constructor
@@ -57,7 +57,7 @@ impl CrabRaveConstructor {
         let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
             PlanetType::D,
             AI::new(),
-            vec![Carbon],
+            vec![Carbon,Hydrogen,Oxygen,Silicon],
             vec![],
             orchestrator_channels,
             explorer_channels,
@@ -269,27 +269,24 @@ impl PlanetAI for AI {
                     }
                 }
 
-                let mut ris = None;
-                if let Some(idx) = peek_charged_cell_index() {
-                    payload_ris.insert(
-                        "Message".to_string(),
-                        "AvailableEnergyCellResponse".to_string(),
-                    );
-                    payload_ris.insert(String::from("Result"), "EnergyCell available".to_string());
-                    payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
-                    ris = Some(PlanetToExplorer::AvailableEnergyCellResponse {
-                        available_cells: n_available_cells,
-                    })
-                } else {
-                    payload_ris.insert(
-                        "Response to".to_string(),
-                        "AvailableEnergyCellRequest".to_string(),
-                    );
-                    payload_ris.insert(
-                        String::from("Result"),
-                        "No EnergyCell available".to_string(),
-                    );
-                }
+                payload_ris.insert(
+                    "Message".to_string(), 
+                    "AvailableEnergyCellResponse".to_string()
+                );
+
+                payload_ris.insert(
+                    String::from("Result"), 
+                    "EnergyCell available".to_string()
+                );
+
+                payload_ris.insert(
+                    String::from("EnergyCell number"), 
+                    format!("{}", n_available_cells)
+                );
+
+                let ris= Some(PlanetToExplorer::AvailableEnergyCellResponse {
+                    available_cells: n_available_cells,
+                });
 
                 //LOG
                 let mut payload = Payload::new();
