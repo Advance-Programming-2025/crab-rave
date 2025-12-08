@@ -6,7 +6,7 @@ use crossbeam_channel::{Receiver, Sender};
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
 use common_game::components::resource::BasicResourceType::Carbon;
 use common_game::components::resource::ComplexResourceType;
-use common_game::components::resource::ComplexResourceType::Diamond;
+//use common_game::components::resource::ComplexResourceType::Diamond;
 use common_game::components::resource::{
     BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest,
     Generator, GenericResource,
@@ -64,10 +64,10 @@ impl CrabRaveConstructor {
         explorer_channels: Receiver<ExplorerToPlanet>,
     ) -> Result<Planet, String> {
         let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
-            PlanetType::C,
+            PlanetType::D,
             AI::new(),
             vec![Carbon],
-            vec![Diamond],
+            vec![],
             orchestrator_channels,
             explorer_channels,
         );
@@ -76,13 +76,6 @@ impl CrabRaveConstructor {
         payload.insert(
             String::from("gen_rules"),
             gen_rules.iter().map(|x| x.res_to_string() + ", ").collect(),
-        );
-        payload.insert(
-            String::from("comb_rules"),
-            comb_rules
-                .iter()
-                .map(|x| x.res_to_string() + ", ")
-                .collect(),
         );
         payload.insert("Message".to_string(), "New planet created".to_string());
 
@@ -419,6 +412,7 @@ impl PlanetAI for AI {
             } => {
                 //LOG
                 let mut payload = Payload::new();
+                let mut payload_ris = Payload::new();
                 payload.insert(
                     "Message".to_string(),
                     "Generate resource request".to_string(),
@@ -430,12 +424,12 @@ impl PlanetAI for AI {
                     ActorType::Planet,
                     state.id().to_string(),
                     EventType::MessageExplorerToPlanet,
-                    Channel::Info,
+                    RCV_MSG_LOG_CHNL,
                     payload,
                 );
+                log_msg!(event, RCV_MSG_LOG_CHNL);
                 log::info!("{}", event);
                 //LOG
-                //TODO add log for the response
                 let requested_resource = resource;
                 // controllo se c'è una cella carica
 
@@ -462,6 +456,29 @@ impl PlanetAI for AI {
                     // verifico il risultato di state.generator.make...
                     match generated_resource {
                         Ok(resource) => {
+                            payload_ris.insert(
+                                "Mesage".to_string(),
+                                "Generated Resource Response".to_string(),
+                            );
+
+                            payload_ris.insert(
+                                "Result".to_string(),
+                                format!("produced resource: {:?}", resource),
+                            );
+
+                            let event_ris = LogEvent::new(
+                                ActorType::Planet,
+                                state.id(),
+                                ActorType::Explorer,
+                                explorer_id.to_string(),
+                                MessagePlanetToExplorer,
+                                ACK_MSG_LOG_CHNL,
+                                payload_ris,
+                            );
+
+                            log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+                            //LOG
                             push_free_cell(cell_idx);
                             return Some(PlanetToExplorer::GenerateResourceResponse {
                                 resource: Some(resource),
@@ -469,13 +486,38 @@ impl PlanetAI for AI {
                         }
                         Err(err) => {
                             push_charged_cell(cell_idx);
-                            println!("{}", err);
+                            println!("{}", err); // TODO add logs to print errors
                         }
                     }
                 } else {
                     //TODO change this in a error log
                     println!("No available cell found"); // non dovrebbe accadere, si spera che l'explorer chieda se ce ne è una libera
                 }
+                //LOG
+
+                payload_ris.insert(
+                    String::from("Response to"),
+                    "Generated resource request".to_string(),
+                );
+
+                payload_ris.insert(
+                    String::from("Result"),
+                    format!("resource: {:?} not produced", resource),
+                );
+
+                let event_ris = LogEvent::new(
+                    ActorType::Planet,
+                    state.id(),
+                    ActorType::Explorer,
+                    explorer_id.to_string(),
+                    MessagePlanetToExplorer,
+                    ACK_MSG_LOG_CHNL,
+                    payload_ris,
+                );
+
+                log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+                //LOG
                 Some(PlanetToExplorer::GenerateResourceResponse { resource: None })
             }
             //TODO use explorer_id to send the gen resource to correct Explorer
@@ -487,6 +529,7 @@ impl PlanetAI for AI {
                 // searching the index of the first free cell
                 //LOG
                 let mut payload = Payload::new();
+                let mut payload_ris = Payload::new();
                 payload.insert(
                     "Message".to_string(),
                     "Combine resource request".to_string(),
@@ -501,11 +544,13 @@ impl PlanetAI for AI {
                     ActorType::Planet,
                     state.id().to_string(),
                     EventType::MessageExplorerToPlanet,
-                    Channel::Info,
+                    RCV_MSG_LOG_CHNL,
                     payload,
                 );
-                log::info!("{}", event);
+
+                log_msg!(event, RCV_MSG_LOG_CHNL);
                 //LOG
+
                 // TODO add log of the response
                 if let Some(cell_idx) = get_charged_cell_index() {
                     let cell = state.cell_mut(cell_idx as usize);
@@ -580,6 +625,32 @@ impl PlanetAI for AI {
                     // checking the result of complex_resource
                     match complex_resource {
                         Ok(resource) => {
+                            //LOG
+
+                            payload_ris.insert(
+                                "Message".to_string(),
+                                "Combine resource response".to_string(),
+                            );
+
+                            payload_ris.insert(
+                                "Result".to_string(),
+                                format!("produced resource: {:?}", resource),
+                            );
+
+                            let event_ris = LogEvent::new(
+                                ActorType::Planet,
+                                state.id(),
+                                ActorType::Explorer,
+                                explorer_id.to_string(),
+                                EventType::MessageExplorerToPlanet,
+                                ACK_MSG_LOG_CHNL,
+                                payload_ris,
+                            );
+
+                            //LOG
+
+                            log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
                             push_free_cell(cell_idx);
                             Some(PlanetToExplorer::CombineResourceResponse {
                                 complex_response: Ok(resource),
@@ -587,15 +658,36 @@ impl PlanetAI for AI {
                         }
                         Err(err) => {
                             push_charged_cell(cell_idx);
-                            println!("{}", err.0);
-                            //TODO change this to log error
+                            //LOG
+
+                            payload_ris.insert(
+                                "Message".to_string(),
+                                "Combine resource response".to_string(),
+                            );
+
+                            payload_ris.insert("Result".to_string(), format!("{:?}", err));
+
+                            let event_ris = LogEvent::new(
+                                ActorType::Planet,
+                                state.id(),
+                                ActorType::Explorer,
+                                explorer_id.to_string(),
+                                EventType::MessageExplorerToPlanet,
+                                ACK_MSG_LOG_CHNL,
+                                payload_ris,
+                            );
+
+                            log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+                            //LOG
+
                             Some(PlanetToExplorer::CombineResourceResponse {
                                 complex_response: Err(err),
                             })
                         }
                     }
                 } else {
-                    //TODO change this to log
+                    //TODO change this to log error
                     println!("No available cell found");
                     let (ret1, ret2) = match resource {
                         ComplexResourceRequest::Water(r1, r2) => (
@@ -623,6 +715,33 @@ impl PlanetAI for AI {
                             GenericResource::ComplexResources(ComplexResource::Life(r2)),
                         ),
                     };
+
+                    //LOG
+
+                    payload_ris.insert(
+                        "Message".to_string(),
+                        "Combine resource response".to_string(),
+                    );
+
+                    payload_ris.insert(
+                        "Result".to_string(),
+                        format!("Err: no available cell. {:?}, {:?}", ret1, ret2),
+                    );
+
+                    let event_ris = LogEvent::new(
+                        ActorType::Planet,
+                        state.id(),
+                        ActorType::Explorer,
+                        explorer_id.to_string(),
+                        EventType::MessageExplorerToPlanet,
+                        ACK_MSG_LOG_CHNL,
+                        payload_ris,
+                    );
+
+                    log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+                    //LOG
+
                     Some(PlanetToExplorer::CombineResourceResponse {
                         complex_response: Err(("no available cell".to_string(), ret1, ret2)),
                     })
@@ -640,7 +759,9 @@ impl PlanetAI for AI {
         //if the planet can't build rockets, you're screwed
         //LOG
         let mut payload = Payload::new();
+        let mut payload_ris = Payload::new();
         payload.insert("Message".to_string(), "Asteroid".to_string());
+        payload_ris.insert("Response to".to_string(), "Asteroid".to_string());
         //LOG
         // TODO add detailed (debug) logging
         let mut ris = None;
@@ -669,20 +790,39 @@ impl PlanetAI for AI {
             }
         }
         if ris.is_none() {
-            payload.insert("Result".to_string(), "no rocket available".to_string());
+            payload_ris.insert("Result".to_string(), "no rocket available".to_string());
         } else {
-            payload.insert("Result".to_string(), "a rocket is available".to_string());
+            payload_ris.insert("Result".to_string(), "a rocket is available".to_string());
         }
+
+        //LOG
+
         let event = LogEvent::new(
             ActorType::Orchestrator,
             0u64,
             ActorType::Planet,
-            state.id().to_string(),
+            state.id().clone().to_string(),
             MessageOrchestratorToPlanet,
-            Channel::Debug,
+            RCV_MSG_LOG_CHNL,
             payload,
         );
-        log::info!("{}", event);
+
+        log_msg!(event, RCV_MSG_LOG_CHNL);
+
+        let event_ris = LogEvent::new(
+            ActorType::Planet,
+            state.id(),
+            ActorType::Orchestrator,
+            "0".to_string(),
+            MessagePlanetToOrchestrator,
+            ACK_MSG_LOG_CHNL,
+            payload_ris,
+        );
+
+        log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+        //LOG
+
         ris
         //shouldn't be able to get here, but just in case...
         //None
@@ -691,32 +831,32 @@ impl PlanetAI for AI {
     fn start(&mut self, state: &PlanetState) {
         //println!("Planet {} AI started", state.id());
         let mut payload = Payload::new();
-        payload.insert("Message".to_string(), "Planet AI started".to_string());
+        payload.insert("Message".to_string(), "Planet AI start".to_string());
         let event = LogEvent::new(
             ActorType::Orchestrator,
             0u64,
             ActorType::Planet,
             state.id().to_string(),
             MessageOrchestratorToPlanet,
-            Channel::Debug,
+            RCV_MSG_LOG_CHNL,
             payload,
         );
-        log::info!("{}", event);
+        log_msg!(event, RCV_MSG_LOG_CHNL);
     }
 
     fn stop(&mut self, _state: &PlanetState) {
         let mut payload = Payload::new();
-        payload.insert("Message".to_string(), "Planet AI started".to_string());
+        payload.insert("Message".to_string(), "Planet AI stop".to_string());
         let event = LogEvent::new(
             ActorType::Orchestrator,
             0u64,
             ActorType::Planet,
             _state.id().to_string(),
             MessageOrchestratorToPlanet,
-            Channel::Debug,
+            RCV_MSG_LOG_CHNL,
             payload,
         );
-        log::info!("{}", event);
+        log_msg!(event, RCV_MSG_LOG_CHNL);
     }
 }
 
