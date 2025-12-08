@@ -46,71 +46,64 @@ macro_rules! log_msg {
         }
     }};
 }
-pub struct CrabRaveConstructor;
+//This function will be called by the Orchestrator
+pub fn create_planet(
+    rx_orchestrator: Receiver<OrchestratorToPlanet>,
+    tx_orchestrator: Sender<PlanetToOrchestrator>,
+    rx_explorer: Receiver<ExplorerToPlanet>,
+    planet_id: u32,
+) -> Result<Planet, String> {
+    let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
+        PlanetType::D,
+        OneMillionCrabs::new(),
+        vec![Carbon, Hydrogen, Oxygen, Silicon],
+        vec![],
+        (rx_orchestrator, tx_orchestrator),
+        rx_explorer,
+    );
 
-impl CrabRaveConstructor {
-    /// Constructor for our planet. Returns a Result:
-    /// The planet object if the initialization went well,
-    /// Err in all other cases. In case of success, the
-    /// output will be logged to the appropriate channel.
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new(
-        id: u32,
-        orchestrator_channels: (Receiver<OrchestratorToPlanet>, Sender<PlanetToOrchestrator>),
-        explorer_channels: Receiver<ExplorerToPlanet>,
-    ) -> Result<Planet, String> {
-        let (planet_type, ai, gen_rules, comb_rules, orchestrator_channels, explorer_channels) = (
-            PlanetType::D,
-            AI::new(),
-            vec![Carbon, Hydrogen, Oxygen, Silicon],
-            vec![],
-            orchestrator_channels,
-            explorer_channels,
-        );
+    //LOG
+    let mut payload = Payload::new();
+    payload.insert(
+        String::from("gen_rules"),
+        gen_rules.iter().map(|x| x.res_to_string() + ", ").collect(),
+    );
+    payload.insert("Message".to_string(), "New planet created".to_string());
+    //LOG
 
-        //LOG
-        let mut payload = Payload::new();
-        payload.insert(
-            String::from("gen_rules"),
-            gen_rules.iter().map(|x| x.res_to_string() + ", ").collect(),
-        );
-        payload.insert("Message".to_string(), "New planet created".to_string());
-        //LOG
+    let new_planet = Planet::new(
+        planet_id,
+        planet_type,
+        Box::new(ai),
+        gen_rules,
+        comb_rules,
+        orchestrator_channels,
+        explorer_channels,
+    )?;
 
-        let new_planet = Planet::new(
-            id,
-            planet_type,
-            Box::new(ai),
-            gen_rules,
-            comb_rules,
-            orchestrator_channels,
-            explorer_channels,
-        )?;
+    //LOG
+    let event = LogEvent::new(
+        ActorType::Orchestrator,
+        0u64,
+        ActorType::Planet,
+        planet_id.to_string(),
+        EventType::MessageOrchestratorToPlanet,
+        Channel::Info,
+        payload,
+    );
+    log::info!("{}", event);
+    //LOG
 
-        //LOG
-        let event = LogEvent::new(
-            ActorType::Orchestrator,
-            0u64,
-            ActorType::Planet,
-            id.to_string(),
-            EventType::MessageOrchestratorToPlanet,
-            Channel::Info,
-            payload,
-        );
-        log::info!("{}", event);
-        //LOG
-
-        Ok(new_planet)
-    }
+    Ok(new_planet)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 // PlanetAI
 ///////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AI;
+pub struct OneMillionCrabs;
 
-impl AI {
+impl OneMillionCrabs {
     fn new() -> Self {
         //LOG
         let mut payload = Payload::new();
@@ -131,7 +124,7 @@ impl AI {
     }
 }
 
-impl PlanetAI for AI {
+impl PlanetAI for OneMillionCrabs {
     fn handle_orchestrator_msg(
         &mut self,
         state: &mut PlanetState,

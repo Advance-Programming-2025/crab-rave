@@ -3,7 +3,7 @@ use planet::*;
 
 #[cfg(test)]
 mod tests {
-    use crate::CrabRaveConstructor;
+    use crate::create_planet;
     use common_game::protocols::messages::{
         ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
     };
@@ -37,10 +37,11 @@ mod tests {
         let planet_to_explorer_channels = planet_receiver;
 
         //Construct crab-rave planet
-        let crab_rave_planet = CrabRaveConstructor::new(
-            0,
-            planet_to_orchestrator_channels,
+        let crab_rave_planet = create_planet(
+            planet_to_orchestrator_channels.0,
+            planet_to_orchestrator_channels.1,
             planet_to_explorer_channels,
+            0,
         );
 
         match crab_rave_planet {
