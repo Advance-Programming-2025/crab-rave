@@ -3,5 +3,5 @@ to import this library in your own project please add this to the dependencies i
 
 ```rust
 [dependencies]
-One-million-crabs = { git = "https://github.com/Advance-Programming-2025/One-million-crabs.git" }
+one-million-crabs = { git = "https://github.com/Advance-Programming-2025/One_million_crabs.git" }
 ```
