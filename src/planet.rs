@@ -1,11 +1,4 @@
-use std::any::Any;
-//use std::collections::{HashMap, HashSet};
-//use std::fmt::Display;
-//use std::sync::{mpsc, LockResult};
-// use std::time::SystemTime;
 use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
-use common_game::components::resource::BasicResourceType::Carbon;
-//use common_game::components::resource::ComplexResourceType::Diamond;
 use common_game::components::resource::BasicResourceType::*;
 use common_game::components::resource::{
     BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest,
@@ -244,7 +237,6 @@ impl PlanetAI for OneMillionCrabs {
             }
             OrchestratorToPlanet::Sunray(sunray) => {
                 let mut payload_ris = Payload::new();
-                let mut ris = None;
                 if let Some(idx) = get_free_cell_index(state.id() as u64) {
 
                     //LOG
@@ -289,10 +281,6 @@ impl PlanetAI for OneMillionCrabs {
                         String::from("Response data"),
                         format!("planet_id: {}", state.id()),
                     );
-
-                    ris = Some(PlanetToOrchestrator::SunrayAck {
-                        planet_id: state.id(),
-                    })
                 } else {
                     payload_ris.insert("Response to".to_string(), "Sunray".to_string());
                     payload_ris.insert(String::from("Result"), String::from("No free cell found"));
@@ -322,7 +310,10 @@ impl PlanetAI for OneMillionCrabs {
                 );
                 log_msg!(event_ris, ACK_MSG_LOG_CHNL);
                 //LOG
-                ris
+
+                Some(PlanetToOrchestrator::SunrayAck {
+                    planet_id: state.id(),
+                })
             }
             _ => {
                 //LOG TODO add more information
