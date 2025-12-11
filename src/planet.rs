@@ -682,7 +682,7 @@ impl PlanetAI for OneMillionCrabs {
                 //renamed msg to resouce to be more consistent with generateresourcerequest
                 // searching the index of the first free cell
 
-                let mut res = Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
+                let res;
 
                 //LOG
                 let mut payload = Payload::new();
@@ -1315,8 +1315,6 @@ pub mod stacks {
     /// returns Some and the correspnding index to charge
     /// or None if there are no available cells
     pub fn get_free_cell_index(planet_id: u64) -> Option<u32> {
-        let mut res;
-
         let free_cell_stack = FREE_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
@@ -1326,7 +1324,7 @@ pub mod stacks {
             "FREE_CELL_STACK.lock()".to_string()
         );
         //LOG
-        match free_cell_stack {
+        let res = match free_cell_stack {
             Ok(mut vec) => {
                 //LOG
                 create_internal_log_msg!(
@@ -1336,7 +1334,7 @@ pub mod stacks {
                     "free_cell_stack.pop()".to_string()
                 );
                 //LOG
-                res = vec.pop();
+                vec.pop()
             }
             Err(err) => {
                 //LOG
@@ -1349,9 +1347,9 @@ pub mod stacks {
                     format!("{:?}", err)
                 );
                 //LOG
-                res = None;
+                None
             }
-        }
+        };
 
         //LOG
         create_internal_log_msg!(
@@ -1380,7 +1378,7 @@ pub mod stacks {
             "CHARGED_CELL_STACK.lock()".to_string()
         );
         //LOG
-        let mut res;
+        let res;
         match charged_cell_stack {
             Ok(mut vec) => {
                 res = vec.pop();
@@ -1568,7 +1566,7 @@ pub mod stacks {
             "CHARGED_CELL_STACK.lock()".to_string()
         );
         //LOG
-        let mut res;
+        let res;
         match charged_cell_stack {
             Ok(vec) => {
                 res = vec.last().copied();
