@@ -26,8 +26,8 @@ const ACK_MSG_LOG_CHNL: Channel = Channel::Info;
 const ERR_LOG_CHNL: Channel = Channel::Error;
 const DEBUG_LOG_CHNL: Channel = Channel::Debug;
 const INTRNL_ACTN_LOG_CHNL: Channel = Channel::Info;
-const TRACE_LOG_CHNL: Channel=Channel::Trace;
-const WARN_LOG_CHNL: Channel=Channel::Warning;
+const TRACE_LOG_CHNL: Channel = Channel::Trace;
+const WARN_LOG_CHNL: Channel = Channel::Warning;
 
 #[macro_export]
 macro_rules! log_msg {
@@ -171,11 +171,17 @@ impl PlanetAI for OneMillionCrabs {
         _combinator: &Combinator,
         msg: OrchestratorToPlanet,
     ) -> Option<PlanetToOrchestrator> {
-
         //LOG
         let mut payload_deb = Payload::new();
         payload_deb.insert("Message".to_string(), "handle_orchestrator_msg".to_string());
-        payload_deb.insert("Data".to_string(), format!("planet state: {:?}, msg: {:?}", PlanetState::to_dummy(state), msg.to_string_2()));
+        payload_deb.insert(
+            "Data".to_string(),
+            format!(
+                "planet state: {:?}, msg: {:?}",
+                PlanetState::to_dummy(state),
+                msg.to_string_2()
+            ),
+        );
         let event_2 = LogEvent::new(
             ActorType::Planet,
             state.id(),
@@ -238,10 +244,9 @@ impl PlanetAI for OneMillionCrabs {
             OrchestratorToPlanet::Sunray(sunray) => {
                 let mut payload_ris = Payload::new();
                 if let Some(idx) = get_free_cell_index(state.id() as u64) {
-
                     //LOG
                     let mut payload_deb = Payload::new();
-                    payload_deb.insert("Action".to_string(), format!("get_free_cell_index"));
+                    payload_deb.insert("Action".to_string(), "get_free_cell_index".to_string());
                     payload_deb.insert("Result".to_string(), format!("Some({})", idx));
                     let event_deb = LogEvent::new(
                         ActorType::Planet,
@@ -260,7 +265,10 @@ impl PlanetAI for OneMillionCrabs {
 
                     //LOG
                     let mut payload_deb = Payload::new();
-                    payload_deb.insert("Action".to_string(), format!("cell_mut(index).charge(sunray)"));
+                    payload_deb.insert(
+                        "Action".to_string(),
+                        "cell_mut(index).charge(sunray)".to_string(),
+                    );
                     payload_deb.insert("Data".to_string(), format!("index: {}", idx));
                     let event_deb = LogEvent::new(
                         ActorType::Planet,
@@ -322,7 +330,14 @@ impl PlanetAI for OneMillionCrabs {
                     String::from("Message"),
                     "message behaviour not defined".to_string(),
                 );
-                payload.insert("Data".to_string(), format!("planet state: {:?}, msg: {:?}", PlanetState::to_dummy(state), msg.to_string_2()));
+                payload.insert(
+                    "Data".to_string(),
+                    format!(
+                        "planet state: {:?}, msg: {:?}",
+                        PlanetState::to_dummy(state),
+                        msg.to_string_2()
+                    ),
+                );
                 let event = LogEvent::new(
                     ActorType::Orchestrator,
                     0u64,
@@ -345,11 +360,17 @@ impl PlanetAI for OneMillionCrabs {
         combinator: &Combinator,
         msg: ExplorerToPlanet,
     ) -> Option<PlanetToExplorer> {
-
         //LOG
         let mut payload_deb = Payload::new();
         payload_deb.insert("Message".to_string(), "handle_orchestrator_msg".to_string());
-        payload_deb.insert("Data".to_string(), format!("planet state: {:?}, msg: {:?}", PlanetState::to_dummy(state), msg.to_string_2()));
+        payload_deb.insert(
+            "Data".to_string(),
+            format!(
+                "planet state: {:?}, msg: {:?}",
+                PlanetState::to_dummy(state),
+                msg.to_string_2()
+            ),
+        );
         let event_deb = LogEvent::new(
             ActorType::Planet,
             state.id(),
@@ -457,7 +478,12 @@ impl PlanetAI for OneMillionCrabs {
                 log_msg!(event, RCV_MSG_LOG_CHNL);
                 log_msg!(event_ris, ACK_MSG_LOG_CHNL);
 
-                create_internal_log_msg!(state.id(), DEBUG_LOG_CHNL, "Action".to_string(), "generator.all_available_recipes()".to_string());
+                create_internal_log_msg!(
+                    state.id(),
+                    DEBUG_LOG_CHNL,
+                    "Action".to_string(),
+                    "generator.all_available_recipes()".to_string()
+                );
                 //LOG
                 Some(PlanetToExplorer::SupportedResourceResponse {
                     resource_list: generator.all_available_recipes(),
@@ -500,7 +526,12 @@ impl PlanetAI for OneMillionCrabs {
                 log_msg!(event, RCV_MSG_LOG_CHNL);
                 log_msg!(event_ris, ACK_MSG_LOG_CHNL);
 
-                create_internal_log_msg!(state.id(), DEBUG_LOG_CHNL, "Action".to_string(), "combinator.all_available_recipes()".to_string());
+                create_internal_log_msg!(
+                    state.id(),
+                    DEBUG_LOG_CHNL,
+                    "Action".to_string(),
+                    "combinator.all_available_recipes()".to_string()
+                );
                 //LOG
                 Some(PlanetToExplorer::SupportedCombinationResponse {
                     combination_list: combinator.all_available_recipes(),
@@ -512,9 +543,8 @@ impl PlanetAI for OneMillionCrabs {
                 explorer_id,
                 resource,
             } => {
-
-                let mut res=Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
-                let mut res_type=false;
+                let mut res = Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
+                let mut res_type = false;
                 //LOG
                 let mut payload = Payload::new();
                 let mut payload_ris = Payload::new();
@@ -549,19 +579,31 @@ impl PlanetAI for OneMillionCrabs {
                     // pattern matching per generare la risorsa corretta
                     let generated_resource = match requested_resource {
                         BasicResourceType::Carbon => {
-                            payload_deb2.insert("Action".to_string(), "generator.make_carbon()".to_string());
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                "generator.make_carbon()".to_string(),
+                            );
                             generator.make_carbon(cell).map(BasicResource::Carbon)
                         } // make_ controlla già se la risorsa è presente in generator
                         BasicResourceType::Silicon => {
-                            payload_deb2.insert("Action".to_string(), "generator.make_silicon()".to_string());
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                "generator.make_silicon()".to_string(),
+                            );
                             generator.make_silicon(cell).map(BasicResource::Silicon)
                         }
                         BasicResourceType::Oxygen => {
-                            payload_deb2.insert("Action".to_string(), "generator.make_oxygen()".to_string());
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                "generator.make_oxygen()".to_string(),
+                            );
                             generator.make_oxygen(cell).map(BasicResource::Oxygen)
                         }
                         BasicResourceType::Hydrogen => {
-                            payload_deb2.insert("Action".to_string(), "generator.make_hydrogen()".to_string());
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                "generator.make_hydrogen()".to_string(),
+                            );
                             generator.make_hydrogen(cell).map(BasicResource::Hydrogen)
                         }
                     };
@@ -586,8 +628,8 @@ impl PlanetAI for OneMillionCrabs {
                             );
                             //LOG
                             push_free_cell(cell_idx, state.id() as u64);
-                            res_type=true;
-                            res= Some(PlanetToExplorer::GenerateResourceResponse {
+                            res_type = true;
+                            res = Some(PlanetToExplorer::GenerateResourceResponse {
                                 resource: Some(resource),
                             });
                         }
@@ -605,7 +647,7 @@ impl PlanetAI for OneMillionCrabs {
                     }
                 }
                 //LOG
-                if res_type==false {
+                if !res_type {
                     payload_ris.insert(
                         String::from("Response to"),
                         "Generated resource request".to_string(),
@@ -640,8 +682,7 @@ impl PlanetAI for OneMillionCrabs {
                 //renamed msg to resouce to be more consistent with generateresourcerequest
                 // searching the index of the first free cell
 
-                let mut res=Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
-                let mut res_type=false;
+                let mut res = Some(PlanetToExplorer::GenerateResourceResponse { resource: None });
 
                 //LOG
                 let mut payload = Payload::new();
@@ -677,82 +718,120 @@ impl PlanetAI for OneMillionCrabs {
                         ComplexResource,
                         (String, GenericResource, GenericResource),
                     > = match resource {
-                        ComplexResourceRequest::Water(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_water({}, {}, {})", r1, r2, cell_idx));
+                        ComplexResourceRequest::Water(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_water({}, {}, {})", r1, r2, cell_idx),
+                            );
 
                             combinator
-                            .make_water(r1, r2, cell)
-                            .map(ComplexResource::Water)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::BasicResources(BasicResource::Hydrogen(r1)),
-                                    GenericResource::BasicResources(BasicResource::Oxygen(r2)),
-                                )
-                            })},
-                        ComplexResourceRequest::Diamond(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_diamond({}, {}, {})", r1, r2, cell_idx));
+                                .make_water(r1, r2, cell)
+                                .map(ComplexResource::Water)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::BasicResources(BasicResource::Hydrogen(
+                                            r1,
+                                        )),
+                                        GenericResource::BasicResources(BasicResource::Oxygen(r2)),
+                                    )
+                                })
+                        }
+                        ComplexResourceRequest::Diamond(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_diamond({}, {}, {})", r1, r2, cell_idx),
+                            );
                             combinator
-                            .make_diamond(r1, r2, cell)
-                            .map(ComplexResource::Diamond)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::BasicResources(BasicResource::Carbon(r1)),
-                                    GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                                )
-                            })},
-                        ComplexResourceRequest::Life(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_life({}, {}, {})", r1, r2, cell_idx));
+                                .make_diamond(r1, r2, cell)
+                                .map(ComplexResource::Diamond)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::BasicResources(BasicResource::Carbon(r1)),
+                                        GenericResource::BasicResources(BasicResource::Carbon(r2)),
+                                    )
+                                })
+                        }
+                        ComplexResourceRequest::Life(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_life({}, {}, {})", r1, r2, cell_idx),
+                            );
                             combinator
-                            .make_life(r1, r2, cell)
-                            .map(ComplexResource::Life)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                                    GenericResource::BasicResources(BasicResource::Carbon(r2)),
-                                )
-                            })},
+                                .make_life(r1, r2, cell)
+                                .map(ComplexResource::Life)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::ComplexResources(ComplexResource::Water(
+                                            r1,
+                                        )),
+                                        GenericResource::BasicResources(BasicResource::Carbon(r2)),
+                                    )
+                                })
+                        }
 
-                        ComplexResourceRequest::Robot(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_robot({}, {}, {})", r1, r2, cell_idx));
+                        ComplexResourceRequest::Robot(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_robot({}, {}, {})", r1, r2, cell_idx),
+                            );
                             combinator
-                            .make_robot(r1, r2, cell)
-                            .map(ComplexResource::Robot)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::BasicResources(BasicResource::Silicon(r1)),
-                                    GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                                )
-                            })},
+                                .make_robot(r1, r2, cell)
+                                .map(ComplexResource::Robot)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::BasicResources(BasicResource::Silicon(r1)),
+                                        GenericResource::ComplexResources(ComplexResource::Life(
+                                            r2,
+                                        )),
+                                    )
+                                })
+                        }
 
-                        ComplexResourceRequest::Dolphin(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_dolphin({}, {}, {})", r1, r2, cell_idx));
+                        ComplexResourceRequest::Dolphin(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_dolphin({}, {}, {})", r1, r2, cell_idx),
+                            );
                             combinator
-                            .make_dolphin(r1, r2, cell)
-                            .map(ComplexResource::Dolphin)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::ComplexResources(ComplexResource::Water(r1)),
-                                    GenericResource::ComplexResources(ComplexResource::Life(r2)),
-                                )
-                            })},
+                                .make_dolphin(r1, r2, cell)
+                                .map(ComplexResource::Dolphin)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::ComplexResources(ComplexResource::Water(
+                                            r1,
+                                        )),
+                                        GenericResource::ComplexResources(ComplexResource::Life(
+                                            r2,
+                                        )),
+                                    )
+                                })
+                        }
 
-                        ComplexResourceRequest::AIPartner(r1, r2) =>{
-                            payload_deb2.insert("Action".to_string(), format!("combinator.make_aipartner({}, {}, {})", r1, r2, cell_idx));
+                        ComplexResourceRequest::AIPartner(r1, r2) => {
+                            payload_deb2.insert(
+                                "Action".to_string(),
+                                format!("combinator.make_aipartner({}, {}, {})", r1, r2, cell_idx),
+                            );
                             combinator
-                            .make_aipartner(r1, r2, cell)
-                            .map(ComplexResource::AIPartner)
-                            .map_err(|(e, r1, r2)| {
-                                (
-                                    e,
-                                    GenericResource::ComplexResources(ComplexResource::Robot(r1)),
-                                    GenericResource::ComplexResources(ComplexResource::Diamond(r2)),
-                                )
-                            })},
+                                .make_aipartner(r1, r2, cell)
+                                .map(ComplexResource::AIPartner)
+                                .map_err(|(e, r1, r2)| {
+                                    (
+                                        e,
+                                        GenericResource::ComplexResources(ComplexResource::Robot(
+                                            r1,
+                                        )),
+                                        GenericResource::ComplexResources(
+                                            ComplexResource::Diamond(r2),
+                                        ),
+                                    )
+                                })
+                        }
                     };
 
                     //LOG
@@ -806,7 +885,7 @@ impl PlanetAI for OneMillionCrabs {
 
                             //LOG
 
-                            res=Some(PlanetToExplorer::CombineResourceResponse {
+                            res = Some(PlanetToExplorer::CombineResourceResponse {
                                 complex_response: Err(err),
                             });
                         }
@@ -817,7 +896,8 @@ impl PlanetAI for OneMillionCrabs {
                         state.id(),
                         ERR_LOG_CHNL,
                         "ERR".to_string(),
-                        "No available cell found, Explorer MUST make sure there are charged cells".to_string()
+                        "No available cell found, Explorer MUST make sure there are charged cells"
+                            .to_string()
                     );
                     //LOG
 
@@ -862,7 +942,7 @@ impl PlanetAI for OneMillionCrabs {
 
                     //LOG
 
-                    res= Some(PlanetToExplorer::CombineResourceResponse {
+                    res = Some(PlanetToExplorer::CombineResourceResponse {
                         complex_response: Err(("no available cell".to_string(), ret1, ret2)),
                     });
                 }
@@ -903,7 +983,10 @@ impl PlanetAI for OneMillionCrabs {
         //LOG
         let mut payload_deb = Payload::new();
         payload_deb.insert("Message".to_string(), "handle_orchestrator_msg".to_string());
-        payload_deb.insert("Data".to_string(), format!("planet state: {:?}", PlanetState::to_dummy(state)));
+        payload_deb.insert(
+            "Data".to_string(),
+            format!("planet state: {:?}", PlanetState::to_dummy(state)),
+        );
         let event_deb = LogEvent::new(
             ActorType::Planet,
             state.id(),
@@ -922,11 +1005,13 @@ impl PlanetAI for OneMillionCrabs {
 
         let mut payload_deb = Payload::new();
         payload_deb.insert("Action".to_string(), "can_have_rocket()".to_string());
-        payload_deb.insert("Response".to_string(), format!("{}", state.can_have_rocket()));
+        payload_deb.insert(
+            "Response".to_string(),
+            format!("{}", state.can_have_rocket()),
+        );
         create_internal_action_log_msg!(payload_deb, state.id());
 
         //LOG
-
 
         let mut ris = None;
         if !state.can_have_rocket() {
@@ -951,7 +1036,6 @@ impl PlanetAI for OneMillionCrabs {
             }
             //try to build a rocket if you have any energy left
             else {
-
                 //LOG
                 let mut payload_deb = Payload::new();
                 payload_deb.insert("Action".to_string(), "get_charged_cell_index()".to_string());
@@ -975,7 +1059,7 @@ impl PlanetAI for OneMillionCrabs {
 
                             push_free_cell(idx, state.id() as u64);
                             //println!("Used a charged cell at index {}, to build a rocket", idx);
-                            ris= state.take_rocket();
+                            ris = state.take_rocket();
                         }
                         //build failed, log the error and return none
                         Err(err) => {
@@ -991,11 +1075,10 @@ impl PlanetAI for OneMillionCrabs {
                             );
                             //LOG
                             push_charged_cell(idx, state.id() as u64);
-                            ris=None;
+                            ris = None;
                         }
                     }
-                }
-                else{
+                } else {
                     //LOG
                     payload_deb.insert("Response".to_string(), "None".to_string());
                     create_internal_action_log_msg!(payload_deb, state.id());
@@ -1103,25 +1186,39 @@ impl ToString2 for ComplexResourceType {
 impl ToString2 for OrchestratorToPlanet {
     fn to_string_2(&self) -> String {
         match self {
-            OrchestratorToPlanet::InternalStateRequest=> { String::from("InternalStateRequest") },
-            OrchestratorToPlanet::Sunray(_) => {String::from("Sunray")},
-            OrchestratorToPlanet::Asteroid(_) => {String::from("Asteroid")},
-            OrchestratorToPlanet::StartPlanetAI => {String::from("StartPlanetAI")},
-            OrchestratorToPlanet::StopPlanetAI => {String::from("StopPlanetAI")},
-            OrchestratorToPlanet::KillPlanet => {String::from("KillPlanet")},
-            OrchestratorToPlanet::IncomingExplorerRequest { .. } => {String::from("IncomingExplorerRequest")},
-            OrchestratorToPlanet::OutgoingExplorerRequest { .. } => {String::from("OutgoingExplorerRequest")},
+            OrchestratorToPlanet::InternalStateRequest => String::from("InternalStateRequest"),
+            OrchestratorToPlanet::Sunray(_) => String::from("Sunray"),
+            OrchestratorToPlanet::Asteroid(_) => String::from("Asteroid"),
+            OrchestratorToPlanet::StartPlanetAI => String::from("StartPlanetAI"),
+            OrchestratorToPlanet::StopPlanetAI => String::from("StopPlanetAI"),
+            OrchestratorToPlanet::KillPlanet => String::from("KillPlanet"),
+            OrchestratorToPlanet::IncomingExplorerRequest { .. } => {
+                String::from("IncomingExplorerRequest")
+            }
+            OrchestratorToPlanet::OutgoingExplorerRequest { .. } => {
+                String::from("OutgoingExplorerRequest")
+            }
         }
     }
 }
 impl ToString2 for ExplorerToPlanet {
     fn to_string_2(&self) -> String {
         match self {
-            ExplorerToPlanet::SupportedResourceRequest { .. } => {String::from("SupportedResourceRequest")},
-            ExplorerToPlanet::SupportedCombinationRequest { .. } => {String::from("SupportedCombinationRequest")},
-            ExplorerToPlanet::GenerateResourceRequest { .. } => {String::from("GenerateResourceRequest")},
-            ExplorerToPlanet::CombineResourceRequest { .. } => {String::from("CombineResourceRequest")},
-            ExplorerToPlanet::AvailableEnergyCellRequest { .. } => {String::from("AvailableEnergyCellRequest")},
+            ExplorerToPlanet::SupportedResourceRequest { .. } => {
+                String::from("SupportedResourceRequest")
+            }
+            ExplorerToPlanet::SupportedCombinationRequest { .. } => {
+                String::from("SupportedCombinationRequest")
+            }
+            ExplorerToPlanet::GenerateResourceRequest { .. } => {
+                String::from("GenerateResourceRequest")
+            }
+            ExplorerToPlanet::CombineResourceRequest { .. } => {
+                String::from("CombineResourceRequest")
+            }
+            ExplorerToPlanet::AvailableEnergyCellRequest { .. } => {
+                String::from("AvailableEnergyCellRequest")
+            }
         }
     }
 }
@@ -1132,9 +1229,9 @@ pub const N_CELLS: usize = 5;
 /// Provides O(1) lookups, charges and discharges.
 pub mod stacks {
     use crate::N_CELLS;
-    use std::sync::Mutex;
-    use common_game::logging::{ActorType, EventType, LogEvent, Payload, Channel};
     use crate::planet::{DEBUG_LOG_CHNL, ERR_LOG_CHNL, TRACE_LOG_CHNL, WARN_LOG_CHNL};
+    use common_game::logging::{ActorType, Channel, EventType, LogEvent, Payload};
+    use std::sync::Mutex;
 
     pub(crate) static FREE_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
     pub(crate) static CHARGED_CELL_STACK: Mutex<Vec<u32>> = Mutex::new(Vec::new());
@@ -1220,15 +1317,14 @@ pub mod stacks {
     pub fn get_free_cell_index(planet_id: u64) -> Option<u32> {
         let mut res;
 
-
         let free_cell_stack = FREE_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
-                    planet_id,
-                    TRACE_LOG_CHNL,
-                    "Action".to_string(),
-                    "FREE_CELL_STACK.lock()".to_string()
-                );
+            planet_id,
+            TRACE_LOG_CHNL,
+            "Action".to_string(),
+            "FREE_CELL_STACK.lock()".to_string()
+        );
         //LOG
         match free_cell_stack {
             Ok(mut vec) => {
@@ -1240,8 +1336,8 @@ pub mod stacks {
                     "free_cell_stack.pop()".to_string()
                 );
                 //LOG
-                res=vec.pop();
-            },
+                res = vec.pop();
+            }
             Err(err) => {
                 //LOG
                 create_internal_log_msg!(
@@ -1253,7 +1349,7 @@ pub mod stacks {
                     format!("{:?}", err)
                 );
                 //LOG
-                res=None;
+                res = None;
             }
         }
 
@@ -1278,16 +1374,16 @@ pub mod stacks {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
-                    planet_id,
-                    TRACE_LOG_CHNL,
-                    "Action".to_string(),
-                    "CHARGED_CELL_STACK.lock()".to_string()
-                );
+            planet_id,
+            TRACE_LOG_CHNL,
+            "Action".to_string(),
+            "CHARGED_CELL_STACK.lock()".to_string()
+        );
         //LOG
         let mut res;
         match charged_cell_stack {
             Ok(mut vec) => {
-                res=vec.pop();
+                res = vec.pop();
                 //LOG
                 create_internal_log_msg!(
                     planet_id,
@@ -1296,7 +1392,7 @@ pub mod stacks {
                     "charged_cell_stack.pop()".to_string()
                 );
                 //LOG
-            },
+            }
             Err(err) => {
                 //LOG
                 create_internal_log_msg!(
@@ -1308,7 +1404,7 @@ pub mod stacks {
                     format!("{:?}", err)
                 );
                 //LOG
-                res=None;
+                res = None;
             }
         }
 
@@ -1362,8 +1458,7 @@ pub mod stacks {
                         format!("free_cell_stack.push({})", index)
                     );
                     //LOG
-                }
-                else{
+                } else {
                     //LOG
                     create_internal_log_msg!(
                         planet_id,
@@ -1427,8 +1522,7 @@ pub mod stacks {
                         format!("charged_cell_stack.push({})", index)
                     );
                     //LOG
-                }
-                else{
+                } else {
                     //LOG
                     create_internal_log_msg!(
                         planet_id,
@@ -1436,7 +1530,11 @@ pub mod stacks {
                         "Action".to_string(),
                         format!("charged_cell_stack.push({})", index),
                         "WARN".to_string(),
-                        format!("charged_cell_stack.len()({})>=N_CELLS({})", vec.len(), N_CELLS)
+                        format!(
+                            "charged_cell_stack.len()({})>=N_CELLS({})",
+                            vec.len(),
+                            N_CELLS
+                        )
                     );
                     //LOG
                 }
@@ -1464,16 +1562,16 @@ pub mod stacks {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
-                    planet_id,
-                    TRACE_LOG_CHNL,
-                    "Action".to_string(),
-                    "CHARGED_CELL_STACK.lock()".to_string()
-                );
+            planet_id,
+            TRACE_LOG_CHNL,
+            "Action".to_string(),
+            "CHARGED_CELL_STACK.lock()".to_string()
+        );
         //LOG
         let mut res;
         match charged_cell_stack {
             Ok(vec) => {
-                res=vec.last().copied();
+                res = vec.last().copied();
                 //LOG
                 create_internal_log_msg!(
                     planet_id,
@@ -1482,8 +1580,7 @@ pub mod stacks {
                     "charged_cell_stack.last().copied()".to_string()
                 );
                 //LOG
-
-            },
+            }
             Err(err) => {
                 //LOG
                 create_internal_log_msg!(
@@ -1495,7 +1592,7 @@ pub mod stacks {
                     format!("{:?}", err)
                 );
                 //LOG
-                res=None;
+                res = None;
             }
         }
         //LOG
