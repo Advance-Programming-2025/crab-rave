@@ -1227,7 +1227,7 @@ pub const N_CELLS: usize = 5;
 
 /// Module used to implement an energy cell management system based on a stack.
 /// Provides O(1) lookups, charges and discharges.
-pub mod stacks {
+mod stacks {
     use crate::N_CELLS;
     use crate::planet::{DEBUG_LOG_CHNL, ERR_LOG_CHNL, TRACE_LOG_CHNL, WARN_LOG_CHNL};
     use common_game::logging::{ActorType, Channel, EventType, LogEvent, Payload};
@@ -1552,10 +1552,14 @@ pub mod stacks {
         }
     }
 
+    // TODO: this is a legacy function.
+    // TODO:  we should remove this
+
     /// checks wether there is an available charged cell,
     /// without actually consuming the value.
     /// Returns Some and the corresponding index or
     /// None if there are no charged cells.
+    #[allow(dead_code)]
     pub fn peek_charged_cell_index(planet_id: u64) -> Option<u32> {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         //LOG
