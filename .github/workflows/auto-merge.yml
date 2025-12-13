@@ -18,8 +18,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
+      - id: automerge
       - name: Auto merge if CI passes
         uses: pascalgn/automerge-action@v0.16.2
         env:
