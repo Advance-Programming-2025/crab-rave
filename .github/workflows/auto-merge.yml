@@ -4,6 +4,10 @@ on:
   pull_request:
     branches:
       - main
+  check_suite:
+      types:
+        - completed
+  status: 
 
 permissions:
       contents: write
@@ -22,3 +26,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MERGE_METHOD: merge
           LOG: info
+          MERGE_RETRIES: "3"
+          MERGE_RETRY_SLEEP: "10000"
