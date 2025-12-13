@@ -1,31 +1,24 @@
 name: Auto Merge Dev to Main
 
 on:
-  push:
+  pull_request:
     branches:
-      - dev
+      - main
 
-jobs:
-  automate-pr:
-    runs-on: ubuntu-latest
-    permissions:
+permissions:
       contents: write
       pull-requests: write
 
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
-
-      - name: Create or update PR
-        uses: repo-sync/pull-request@v2
-        with:
-          source_branch: dev
-          destination_branch: main
-          pr_title: "Auto-PR: dev → main"
-          pr_body: "Automatic PR to merge dev into main."
 
       - name: Auto merge if CI passes
         uses: pascalgn/automerge-action@v0.16.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MERGE_METHOD: merge
-          LOG: debug
+          LOG: info
