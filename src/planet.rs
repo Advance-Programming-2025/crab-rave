@@ -1553,7 +1553,7 @@ mod stacks {
     }
 
     // TODO: this is a legacy function,
-    // TODO:  we should remove this
+    // TODO:  we should remove it
 
     /// checks wether there is an available charged cell,
     /// without actually consuming the value.
