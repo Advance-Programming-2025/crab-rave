@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - id: automerge
       - name: Auto merge if CI passes
         uses: pascalgn/automerge-action@v0.16.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MERGE_METHOD: merge
+          MERGE_LABELS: ""
           LOG: info
           MERGE_RETRIES: "3"
           MERGE_RETRY_SLEEP: "10000"
