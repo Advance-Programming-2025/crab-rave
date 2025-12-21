@@ -1,19 +1,22 @@
-use common_game::components::planet::{Planet, PlanetAI, PlanetState, PlanetType};
+use common_game::components::planet::{
+    DummyPlanetState, Planet, PlanetAI, PlanetState, PlanetType,
+};
 use common_game::components::resource::BasicResourceType::*;
 use common_game::components::resource::{
     BasicResource, BasicResourceType, Combinator, ComplexResource, ComplexResourceRequest,
     ComplexResourceType, Generator, GenericResource,
 };
 use common_game::components::rocket::Rocket;
-use common_game::protocols::messages::{
-    ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
-};
+use common_game::components::sunray::Sunray;
+use common_game::protocols::orchestrator_planet::{OrchestratorToPlanet, PlanetToOrchestrator};
+use common_game::protocols::planet_explorer::{ExplorerToPlanet, PlanetToExplorer};
 use crossbeam_channel::{Receiver, Sender};
 
 use common_game::logging::EventType::{
     MessageOrchestratorToPlanet, MessagePlanetToExplorer, MessagePlanetToOrchestrator,
 };
-use common_game::logging::{ActorType, Channel, EventType, LogEvent, Payload};
+use common_game::logging::{ActorType, Channel, EventType, LogEvent, Participant, Payload};
+use common_game::utils::ID;
 use stacks::{
     get_charged_cell_index, get_free_cell_index, initialize_free_cell_stack, push_charged_cell,
     push_free_cell,
@@ -59,10 +62,8 @@ macro_rules! create_internal_log_msg {
             payload.insert($a, $b);
         )*
         let event_deb = LogEvent::new(
-            ActorType::Planet,
-            $id,
-            ActorType::Planet,
-            $id.to_string(),
+            Some(Participant::new(ActorType::Planet,$id)),
+            Some(Participant::new(ActorType::Planet,$id)),
             EventType::InternalPlanetAction,
             $channel,
             payload,
@@ -74,10 +75,8 @@ macro_rules! create_internal_log_msg {
 macro_rules! create_internal_action_log_msg {
     ($payload:expr, $id:expr) => {{
         let event_deb = LogEvent::new(
-            ActorType::Planet,
-            $id,
-            ActorType::Planet,
-            $id.to_string(),
+            Some(Participant::new(ActorType::Planet, $id)),
+            Some(Participant::new(ActorType::Planet, $id)),
             EventType::InternalPlanetAction,
             DEBUG_LOG_CHNL,
             $payload,
@@ -122,10 +121,8 @@ pub fn create_planet(
 
     //LOG
     let event = LogEvent::new(
-        ActorType::Planet,
-        planet_id,
-        ActorType::Planet,
-        planet_id.to_string(),
+        Some(Participant::new(ActorType::Planet, planet_id)),
+        Some(Participant::new(ActorType::Planet, planet_id)),
         EventType::InternalPlanetAction,
         INTRNL_ACTN_LOG_CHNL,
         payload,
@@ -148,209 +145,259 @@ impl OneMillionCrabs {
         let mut payload = Payload::new();
         payload.insert(String::from("Message"), String::from("New AI created"));
         let event = LogEvent::new(
-            ActorType::Planet,
-            0u64,
-            ActorType::Planet,
-            "0".to_string(),
+            Some(Participant::new(ActorType::Planet, 0u32)),
+            Some(Participant::new(ActorType::Planet, 0u32)),
             EventType::InternalPlanetAction,
             INTRNL_ACTN_LOG_CHNL,
             payload,
         );
         log_msg!(event, INTRNL_ACTN_LOG_CHNL);
         //LOG
-        initialize_free_cell_stack(0u64);
+        initialize_free_cell_stack(0u32);
         Self
     }
 }
 
 impl PlanetAI for OneMillionCrabs {
-    fn handle_orchestrator_msg(
+    fn handle_sunray(
         &mut self,
         state: &mut PlanetState,
         _generator: &Generator,
         _combinator: &Combinator,
-        msg: OrchestratorToPlanet,
-    ) -> Option<PlanetToOrchestrator> {
+        sunray: Sunray,
+    ) {
+        let mut payload_ris = Payload::new();
+        if let Some(idx) = get_free_cell_index(state.id()) {
+            //LOG
+            let mut payload_deb = Payload::new();
+            payload_deb.insert("Action".to_string(), "get_free_cell_index".to_string());
+            payload_deb.insert("Result".to_string(), format!("Some({})", idx));
+            let event_deb = LogEvent::new(
+                Some(Participant::new(ActorType::Planet, state.id())),
+                Some(Participant::new(ActorType::Planet, state.id())),
+                EventType::InternalPlanetAction,
+                DEBUG_LOG_CHNL,
+                payload_deb,
+            );
+            log_msg!(event_deb, DEBUG_LOG_CHNL);
+            //LOG
+
+            state.cell_mut(idx as usize).charge(sunray);
+            push_charged_cell(idx, state.id());
+
+            //LOG
+            let mut payload_deb = Payload::new();
+            payload_deb.insert(
+                "Action".to_string(),
+                "cell_mut(index).charge(sunray)".to_string(),
+            );
+            payload_deb.insert("Data".to_string(), format!("index: {}", idx));
+            let event_deb = LogEvent::new(
+                Some(Participant::new(ActorType::Planet, state.id())),
+                Some(Participant::new(ActorType::Planet, state.id())),
+                EventType::InternalPlanetAction,
+                DEBUG_LOG_CHNL,
+                payload_deb,
+            );
+            log_msg!(event_deb, DEBUG_LOG_CHNL);
+            //LOG
+
+            payload_ris.insert("Message".to_string(), "SunrayAck".to_string());
+            payload_ris.insert(String::from("Result"), String::from("EnergyCell charged"));
+            payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
+            payload_ris.insert(
+                String::from("Response data"),
+                format!("planet_id: {}", state.id()),
+            );
+        } else {
+            payload_ris.insert("Response to".to_string(), "Sunray".to_string());
+            payload_ris.insert(String::from("Result"), String::from("No free cell found"));
+        }
+
+        //LOG
+        let mut payload = Payload::new();
+        payload.insert(String::from("Message"), String::from("Sunray"));
+        let event = LogEvent::new(
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            Some(Participant::new(ActorType::Planet, state.id())),
+            EventType::MessageOrchestratorToPlanet,
+            RCV_MSG_LOG_CHNL,
+            payload,
+        );
+        log_msg!(event, RCV_MSG_LOG_CHNL);
+        let event_ris = LogEvent::new(
+            Some(Participant::new(ActorType::Planet, state.id())),
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            MessagePlanetToOrchestrator,
+            ACK_MSG_LOG_CHNL,
+            payload_ris,
+        );
+        log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+        //LOG
+    }
+
+    /// Handler used to determine the strategy in case of an incoming asteroid.
+    /// It will usually try to build a rocket if it can and if it has any
+    /// energy cells available.
+    /// As for our planet, it's a type D, so the planet will ALWAYS die
+    /// when it gets an asteroid. Any other behavior is unexpected and
+    /// should be reported.
+    /// Refer to the common crate documentation for more info on the
+    /// default behavior of this function.
+    fn handle_asteroid(
+        &mut self,
+        state: &mut PlanetState,
+        _generator: &Generator,
+        _combinator: &Combinator,
+    ) -> Option<Rocket> {
+        //if the planet can't build rockets, you're screwed
+
         //LOG
         let mut payload_deb = Payload::new();
         payload_deb.insert("Message".to_string(), "handle_orchestrator_msg".to_string());
         payload_deb.insert(
             "Data".to_string(),
-            format!(
-                "planet state: {:?}, msg: {:?}",
-                PlanetState::to_dummy(state),
-                msg.to_string_2()
-            ),
+            format!("planet state: {:?}", PlanetState::to_dummy(state)),
         );
-        let event_2 = LogEvent::new(
-            ActorType::Planet,
-            state.id(),
-            ActorType::Planet,
-            state.id().to_string(),
+        let event_deb = LogEvent::new(
+            Some(Participant::new(ActorType::Planet, state.id())),
+            Some(Participant::new(ActorType::Planet, state.id())),
             EventType::InternalPlanetAction,
             DEBUG_LOG_CHNL,
             payload_deb,
         );
-        log_msg!(event_2, DEBUG_LOG_CHNL);
+        log_msg!(event_deb, DEBUG_LOG_CHNL);
+
+        let mut payload = Payload::new();
+        let mut payload_ris = Payload::new();
+        payload.insert("Message".to_string(), "Asteroid".to_string());
+        payload_ris.insert("Response to".to_string(), "Asteroid".to_string());
+
+        let mut payload_deb = Payload::new();
+        payload_deb.insert("Action".to_string(), "can_have_rocket()".to_string());
+        payload_deb.insert(
+            "Response".to_string(),
+            format!("{}", state.can_have_rocket()),
+        );
+        create_internal_action_log_msg!(payload_deb, state.id());
+
         //LOG
 
-        match msg {
-            OrchestratorToPlanet::InternalStateRequest => {
+        let mut ris = None;
+        if !state.can_have_rocket() {
+            ris = None;
+        }
+        //if you've already got a rocket ready, use it!
+        else {
+            //LOG
+            let mut payload_deb = Payload::new();
+            payload_deb.insert("Action".to_string(), "has_rocket()".to_string());
+            payload_deb.insert("Response".to_string(), format!("{}", state.has_rocket()));
+            create_internal_action_log_msg!(payload_deb, state.id());
+            //LOG
+
+            if state.has_rocket() {
                 //LOG
-                let mut payload = Payload::new();
-                payload.insert(
-                    "PlanetState".to_string(),
-                    format!("{:?}", PlanetState::to_dummy(state)),
-                );
-                payload.insert(
-                    String::from("Message"),
-                    String::from("Internal state request"),
-                );
-                let event = LogEvent::new(
-                    ActorType::Orchestrator,
-                    0u64,
-                    ActorType::Planet,
-                    state.id().to_string(),
-                    EventType::MessageOrchestratorToPlanet,
-                    RCV_MSG_LOG_CHNL,
-                    payload,
-                );
-                log_msg!(event, RCV_MSG_LOG_CHNL);
-                let mut payload_ris = Payload::new();
-                payload_ris.insert(
-                    String::from("ACK Response of InternalStateRequest"),
-                    format!(
-                        "planet_id: {:?}, planet_state: {:?}",
-                        state.id(),
-                        PlanetState::to_dummy(state)
-                    ),
-                );
-                let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Orchestrator,
-                    "0".to_string(),
-                    MessagePlanetToOrchestrator,
-                    ACK_MSG_LOG_CHNL,
-                    payload_ris,
-                );
-                log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+                let mut payload_deb = Payload::new();
+                payload_deb.insert("Action".to_string(), "take_rocket()".to_string());
+                create_internal_action_log_msg!(payload_deb, state.id());
                 //LOG
-                Some(PlanetToOrchestrator::InternalStateResponse {
-                    planet_id: state.id(),
-                    planet_state: PlanetState::to_dummy(state),
-                })
+                ris = state.take_rocket();
             }
-            OrchestratorToPlanet::Sunray(sunray) => {
-                let mut payload_ris = Payload::new();
-                if let Some(idx) = get_free_cell_index(state.id() as u64) {
+            //try to build a rocket if you have any energy left
+            else {
+                //LOG
+                let mut payload_deb = Payload::new();
+                payload_deb.insert("Action".to_string(), "get_charged_cell_index()".to_string());
+                //LOG
+
+                if let Some(idx) = get_charged_cell_index(state.id()) {
                     //LOG
-                    let mut payload_deb = Payload::new();
-                    payload_deb.insert("Action".to_string(), "get_free_cell_index".to_string());
-                    payload_deb.insert("Result".to_string(), format!("Some({})", idx));
-                    let event_deb = LogEvent::new(
-                        ActorType::Planet,
-                        state.id(),
-                        ActorType::Planet,
-                        state.id().to_string(),
-                        EventType::InternalPlanetAction,
-                        DEBUG_LOG_CHNL,
-                        payload_deb,
-                    );
-                    log_msg!(event_deb, DEBUG_LOG_CHNL);
+                    payload_deb.insert("Response".to_string(), format!("Some({})", idx));
+                    create_internal_action_log_msg!(payload_deb, state.id());
+
+                    let mut payload_deb2 = Payload::new();
+                    payload_deb2.insert("Action".to_string(), format!("build_rocket({})", idx));
                     //LOG
 
-                    state.cell_mut(idx as usize).charge(sunray);
-                    push_charged_cell(idx, state.id() as u64);
+                    match state.build_rocket(idx as usize) {
+                        Ok(_) => {
+                            //LOG
+                            payload_deb2.insert("Response".to_string(), "Ok".to_string());
+                            create_internal_action_log_msg!(payload_deb2, state.id());
+                            //LOG
 
-                    //LOG
-                    let mut payload_deb = Payload::new();
-                    payload_deb.insert(
-                        "Action".to_string(),
-                        "cell_mut(index).charge(sunray)".to_string(),
-                    );
-                    payload_deb.insert("Data".to_string(), format!("index: {}", idx));
-                    let event_deb = LogEvent::new(
-                        ActorType::Planet,
-                        state.id(),
-                        ActorType::Planet,
-                        state.id().to_string(),
-                        EventType::InternalPlanetAction,
-                        DEBUG_LOG_CHNL,
-                        payload_deb,
-                    );
-                    log_msg!(event_deb, DEBUG_LOG_CHNL);
-                    //LOG
+                            push_free_cell(idx, state.id());
+                            //println!("Used a charged cell at index {}, to build a rocket", idx);
+                            ris = state.take_rocket();
+                        }
+                        //build failed, log the error and return none
+                        Err(err) => {
+                            //LOG
+                            payload_deb2.insert("Response".to_string(), "Err".to_string());
+                            create_internal_action_log_msg!(payload_deb2, state.id());
 
-                    payload_ris.insert("Message".to_string(), "SunrayAck".to_string());
-                    payload_ris.insert(String::from("Result"), String::from("EnergyCell charged"));
-                    payload_ris.insert(String::from("EnergyCell index"), format!("{}", idx));
-                    payload_ris.insert(
-                        String::from("Response data"),
-                        format!("planet_id: {}", state.id()),
-                    );
+                            create_internal_log_msg!(
+                                state.id(),
+                                ERR_LOG_CHNL,
+                                "ERR".to_string(),
+                                format!("{}", err)
+                            );
+                            //LOG
+                            push_charged_cell(idx, state.id());
+                            ris = None;
+                        }
+                    }
                 } else {
-                    payload_ris.insert("Response to".to_string(), "Sunray".to_string());
-                    payload_ris.insert(String::from("Result"), String::from("No free cell found"));
+                    //LOG
+                    payload_deb.insert("Response".to_string(), "None".to_string());
+                    create_internal_action_log_msg!(payload_deb, state.id());
+                    //LOG
                 }
-
-                //LOG
-                let mut payload = Payload::new();
-                payload.insert(String::from("Message"), String::from("Sunray"));
-                let event = LogEvent::new(
-                    ActorType::Orchestrator,
-                    0u64,
-                    ActorType::Planet,
-                    state.id().to_string(),
-                    EventType::MessageOrchestratorToPlanet,
-                    RCV_MSG_LOG_CHNL,
-                    payload,
-                );
-                log_msg!(event, RCV_MSG_LOG_CHNL);
-                let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Orchestrator,
-                    "0".to_string(),
-                    MessagePlanetToOrchestrator,
-                    ACK_MSG_LOG_CHNL,
-                    payload_ris,
-                );
-                log_msg!(event_ris, ACK_MSG_LOG_CHNL);
-                //LOG
-
-                Some(PlanetToOrchestrator::SunrayAck {
-                    planet_id: state.id(),
-                })
-            }
-            _ => {
-                //LOG TODO add more information
-                let mut payload = Payload::new();
-                payload.insert(
-                    String::from("Message"),
-                    "message behaviour not defined".to_string(),
-                );
-                payload.insert(
-                    "Data".to_string(),
-                    format!(
-                        "planet state: {:?}, msg: {:?}",
-                        PlanetState::to_dummy(state),
-                        msg.to_string_2()
-                    ),
-                );
-                let event = LogEvent::new(
-                    ActorType::Orchestrator,
-                    0u64,
-                    ActorType::Planet,
-                    state.id().to_string(),
-                    EventType::MessageOrchestratorToPlanet,
-                    ERR_LOG_CHNL,
-                    payload,
-                );
-                log_msg!(event, ERR_LOG_CHNL);
-                None
             }
         }
+        if ris.is_none() {
+            payload_ris.insert("Result".to_string(), "no rocket available".to_string());
+        } else {
+            payload_ris.insert("Result".to_string(), "a rocket is available".to_string());
+        }
+
+        //LOG
+
+        let event = LogEvent::new(
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            Some(Participant::new(ActorType::Planet, state.id())),
+            MessageOrchestratorToPlanet,
+            RCV_MSG_LOG_CHNL,
+            payload,
+        );
+
+        log_msg!(event, RCV_MSG_LOG_CHNL);
+
+        let event_ris = LogEvent::new(
+            Some(Participant::new(ActorType::Planet, state.id())),
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            MessagePlanetToOrchestrator,
+            ACK_MSG_LOG_CHNL,
+            payload_ris,
+        );
+
+        log_msg!(event_ris, ACK_MSG_LOG_CHNL);
+
+        //LOG
+
+        ris
+        //shouldn't be able to get here, but just in case...
+        //None
+    }
+
+    fn handle_internal_state_req(
+        &mut self,
+        state: &mut PlanetState,
+        _generator: &Generator,
+        _combinator: &Combinator,
+    ) -> DummyPlanetState {
+        state.to_dummy()
     }
 
     fn handle_explorer_msg(
@@ -372,10 +419,8 @@ impl PlanetAI for OneMillionCrabs {
             ),
         );
         let event_deb = LogEvent::new(
-            ActorType::Planet,
-            state.id(),
-            ActorType::Planet,
-            state.id().to_string(),
+            Some(Participant::new(ActorType::Planet, state.id())),
+            Some(Participant::new(ActorType::Planet, state.id())),
             EventType::InternalPlanetAction,
             DEBUG_LOG_CHNL,
             payload_deb,
@@ -419,19 +464,15 @@ impl PlanetAI for OneMillionCrabs {
                     String::from("Available EnergyCell request"),
                 );
                 let event = LogEvent::new(
-                    ActorType::Explorer,
-                    id,
-                    ActorType::Planet,
-                    state.id().to_string(),
+                    Some(Participant::new(ActorType::Explorer, id)),
+                    Some(Participant::new(ActorType::Planet, state.id())),
                     EventType::MessageExplorerToPlanet,
                     RCV_MSG_LOG_CHNL,
                     payload,
                 );
                 let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Orchestrator,
-                    "0".to_string(),
+                    Some(Participant::new(ActorType::Planet, state.id())),
+                    Some(Participant::new(ActorType::Orchestrator, 0u32)),
                     MessagePlanetToOrchestrator,
                     ACK_MSG_LOG_CHNL,
                     payload_ris,
@@ -458,19 +499,15 @@ impl PlanetAI for OneMillionCrabs {
                     format!("resource_list: {:?})", generator.all_available_recipes()),
                 );
                 let event = LogEvent::new(
-                    ActorType::Explorer,
-                    id,
-                    ActorType::Planet,
-                    state.id().to_string(),
+                    Some(Participant::new(ActorType::Explorer, id)),
+                    Some(Participant::new(ActorType::Planet, state.id())),
                     EventType::MessageExplorerToPlanet,
                     RCV_MSG_LOG_CHNL,
                     payload,
                 );
                 let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Explorer,
-                    id.to_string(),
+                    Some(Participant::new(ActorType::Planet, state.id())),
+                    Some(Participant::new(ActorType::Explorer, id)),
                     EventType::MessagePlanetToExplorer,
                     ACK_MSG_LOG_CHNL,
                     payload_ris,
@@ -506,19 +543,15 @@ impl PlanetAI for OneMillionCrabs {
                     format!("combination_list: {:?}", combinator.all_available_recipes()),
                 );
                 let event = LogEvent::new(
-                    ActorType::Explorer,
-                    id,
-                    ActorType::Planet,
-                    state.id().to_string(),
+                    Some(Participant::new(ActorType::Explorer, id)),
+                    Some(Participant::new(ActorType::Planet, state.id())),
                     EventType::MessageExplorerToPlanet,
                     RCV_MSG_LOG_CHNL,
                     payload,
                 );
                 let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Explorer,
-                    id.to_string(),
+                    Some(Participant::new(ActorType::Planet, state.id())),
+                    Some(Participant::new(ActorType::Explorer, id)),
                     MessagePlanetToExplorer,
                     ACK_MSG_LOG_CHNL,
                     payload_ris,
@@ -554,10 +587,8 @@ impl PlanetAI for OneMillionCrabs {
                 );
                 payload.insert("requested resource".to_string(), format!("{:?}", resource));
                 let event = LogEvent::new(
-                    ActorType::Explorer,
-                    explorer_id,
-                    ActorType::Planet,
-                    state.id().to_string(),
+                    Some(Participant::new(ActorType::Explorer, explorer_id)),
+                    Some(Participant::new(ActorType::Planet, state.id())),
                     EventType::MessageExplorerToPlanet,
                     RCV_MSG_LOG_CHNL,
                     payload,
@@ -568,7 +599,7 @@ impl PlanetAI for OneMillionCrabs {
                 let requested_resource = resource;
                 // controllo se c'è una cella carica
 
-                if let Some(cell_idx) = get_charged_cell_index(state.id() as u64) {
+                if let Some(cell_idx) = get_charged_cell_index(state.id()) {
                     //LOG
                     let mut payload_deb2 = Payload::new();
                     //LOG
@@ -627,7 +658,7 @@ impl PlanetAI for OneMillionCrabs {
                                 format!("produced resource: {:?}", resource),
                             );
                             //LOG
-                            push_free_cell(cell_idx, state.id() as u64);
+                            push_free_cell(cell_idx, state.id());
                             res_type = true;
                             res = Some(PlanetToExplorer::GenerateResourceResponse {
                                 resource: Some(resource),
@@ -642,7 +673,7 @@ impl PlanetAI for OneMillionCrabs {
                                 format!("{:?}", err)
                             );
                             //LOG
-                            push_charged_cell(cell_idx, state.id() as u64);
+                            push_charged_cell(cell_idx, state.id());
                         }
                     }
                 }
@@ -660,10 +691,8 @@ impl PlanetAI for OneMillionCrabs {
                 }
 
                 let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Explorer,
-                    explorer_id.to_string(),
+                    Some(Participant::new(ActorType::Planet, state.id())),
+                    Some(Participant::new(ActorType::Explorer, explorer_id)),
                     MessagePlanetToExplorer,
                     ACK_MSG_LOG_CHNL,
                     payload_ris,
@@ -696,10 +725,8 @@ impl PlanetAI for OneMillionCrabs {
                     format!("{:?}", resource),
                 );
                 let event = LogEvent::new(
-                    ActorType::Explorer,
-                    explorer_id,
-                    ActorType::Planet,
-                    state.id().to_string(),
+                    Some(Participant::new(ActorType::Explorer, explorer_id)),
+                    Some(Participant::new(ActorType::Planet, state.id())),
                     EventType::MessageExplorerToPlanet,
                     RCV_MSG_LOG_CHNL,
                     payload,
@@ -708,7 +735,7 @@ impl PlanetAI for OneMillionCrabs {
                 log_msg!(event, RCV_MSG_LOG_CHNL);
                 //LOG
 
-                if let Some(cell_idx) = get_charged_cell_index(state.id() as u64) {
+                if let Some(cell_idx) = get_charged_cell_index(state.id()) {
                     //LOG
                     let mut payload_deb2 = Payload::new();
                     //LOG
@@ -855,13 +882,13 @@ impl PlanetAI for OneMillionCrabs {
                             );
                             //LOG
 
-                            push_free_cell(cell_idx, state.id() as u64);
+                            push_free_cell(cell_idx, state.id());
                             res = Some(PlanetToExplorer::CombineResourceResponse {
                                 complex_response: Ok(resource),
                             });
                         }
                         Err(err) => {
-                            push_charged_cell(cell_idx, state.id() as u64);
+                            push_charged_cell(cell_idx, state.id());
                             //LOG
                             payload_ris.insert(
                                 "Message".to_string(),
@@ -873,10 +900,8 @@ impl PlanetAI for OneMillionCrabs {
                             let mut payload_deb2 = Payload::new();
                             payload_deb2.insert("ERR".to_string(), format!("{:?}", err));
                             let event_deb2 = LogEvent::new(
-                                ActorType::Planet,
-                                state.id(),
-                                ActorType::Planet,
-                                state.id().to_string(),
+                                Some(Participant::new(ActorType::Planet, state.id())),
+                                Some(Participant::new(ActorType::Planet, state.id())),
                                 EventType::InternalPlanetAction,
                                 ERR_LOG_CHNL,
                                 payload_deb2,
@@ -948,10 +973,8 @@ impl PlanetAI for OneMillionCrabs {
                 }
 
                 let event_ris = LogEvent::new(
-                    ActorType::Planet,
-                    state.id(),
-                    ActorType::Explorer,
-                    explorer_id.to_string(),
+                    Some(Participant::new(ActorType::Planet, state.id())),
+                    Some(Participant::new(ActorType::Explorer, explorer_id)),
                     EventType::MessageExplorerToPlanet,
                     ACK_MSG_LOG_CHNL,
                     payload_ris,
@@ -964,176 +987,33 @@ impl PlanetAI for OneMillionCrabs {
         }
     }
 
-    /// Handler used to determine the strategy in case of an incoming asteroid.
-    /// It will usually try to build a rocket if it can and if it has any
-    /// energy cells available.
-    /// As for our planet, it's a type D, so the planet will ALWAYS die
-    /// when it gets an asteroid. Any other behavior is unexpected and
-    /// should be reported.
-    /// Refer to the common crate documentation for more info on the
-    /// default behavior of this function.
-    fn handle_asteroid(
+    fn on_explorer_arrival(
         &mut self,
-        state: &mut PlanetState,
+        _state: &mut PlanetState,
         _generator: &Generator,
         _combinator: &Combinator,
-    ) -> Option<Rocket> {
-        //if the planet can't build rockets, you're screwed
-
-        //LOG
-        let mut payload_deb = Payload::new();
-        payload_deb.insert("Message".to_string(), "handle_orchestrator_msg".to_string());
-        payload_deb.insert(
-            "Data".to_string(),
-            format!("planet state: {:?}", PlanetState::to_dummy(state)),
-        );
-        let event_deb = LogEvent::new(
-            ActorType::Planet,
-            state.id(),
-            ActorType::Planet,
-            state.id().to_string(),
-            EventType::InternalPlanetAction,
-            DEBUG_LOG_CHNL,
-            payload_deb,
-        );
-        log_msg!(event_deb, DEBUG_LOG_CHNL);
-
-        let mut payload = Payload::new();
-        let mut payload_ris = Payload::new();
-        payload.insert("Message".to_string(), "Asteroid".to_string());
-        payload_ris.insert("Response to".to_string(), "Asteroid".to_string());
-
-        let mut payload_deb = Payload::new();
-        payload_deb.insert("Action".to_string(), "can_have_rocket()".to_string());
-        payload_deb.insert(
-            "Response".to_string(),
-            format!("{}", state.can_have_rocket()),
-        );
-        create_internal_action_log_msg!(payload_deb, state.id());
-
-        //LOG
-
-        let mut ris = None;
-        if !state.can_have_rocket() {
-            ris = None;
-        }
-        //if you've already got a rocket ready, use it!
-        else {
-            //LOG
-            let mut payload_deb = Payload::new();
-            payload_deb.insert("Action".to_string(), "has_rocket()".to_string());
-            payload_deb.insert("Response".to_string(), format!("{}", state.has_rocket()));
-            create_internal_action_log_msg!(payload_deb, state.id());
-            //LOG
-
-            if state.has_rocket() {
-                //LOG
-                let mut payload_deb = Payload::new();
-                payload_deb.insert("Action".to_string(), "take_rocket()".to_string());
-                create_internal_action_log_msg!(payload_deb, state.id());
-                //LOG
-                ris = state.take_rocket();
-            }
-            //try to build a rocket if you have any energy left
-            else {
-                //LOG
-                let mut payload_deb = Payload::new();
-                payload_deb.insert("Action".to_string(), "get_charged_cell_index()".to_string());
-                //LOG
-
-                if let Some(idx) = get_charged_cell_index(state.id() as u64) {
-                    //LOG
-                    payload_deb.insert("Response".to_string(), format!("Some({})", idx));
-                    create_internal_action_log_msg!(payload_deb, state.id());
-
-                    let mut payload_deb2 = Payload::new();
-                    payload_deb2.insert("Action".to_string(), format!("build_rocket({})", idx));
-                    //LOG
-
-                    match state.build_rocket(idx as usize) {
-                        Ok(_) => {
-                            //LOG
-                            payload_deb2.insert("Response".to_string(), "Ok".to_string());
-                            create_internal_action_log_msg!(payload_deb2, state.id());
-                            //LOG
-
-                            push_free_cell(idx, state.id() as u64);
-                            //println!("Used a charged cell at index {}, to build a rocket", idx);
-                            ris = state.take_rocket();
-                        }
-                        //build failed, log the error and return none
-                        Err(err) => {
-                            //LOG
-                            payload_deb2.insert("Response".to_string(), "Err".to_string());
-                            create_internal_action_log_msg!(payload_deb2, state.id());
-
-                            create_internal_log_msg!(
-                                state.id(),
-                                ERR_LOG_CHNL,
-                                "ERR".to_string(),
-                                format!("{}", err)
-                            );
-                            //LOG
-                            push_charged_cell(idx, state.id() as u64);
-                            ris = None;
-                        }
-                    }
-                } else {
-                    //LOG
-                    payload_deb.insert("Response".to_string(), "None".to_string());
-                    create_internal_action_log_msg!(payload_deb, state.id());
-                    //LOG
-                }
-            }
-        }
-        if ris.is_none() {
-            payload_ris.insert("Result".to_string(), "no rocket available".to_string());
-        } else {
-            payload_ris.insert("Result".to_string(), "a rocket is available".to_string());
-        }
-
-        //LOG
-
-        let event = LogEvent::new(
-            ActorType::Orchestrator,
-            0u64,
-            ActorType::Planet,
-            state.id().to_string(),
-            MessageOrchestratorToPlanet,
-            RCV_MSG_LOG_CHNL,
-            payload,
-        );
-
-        log_msg!(event, RCV_MSG_LOG_CHNL);
-
-        let event_ris = LogEvent::new(
-            ActorType::Planet,
-            state.id(),
-            ActorType::Orchestrator,
-            "0".to_string(),
-            MessagePlanetToOrchestrator,
-            ACK_MSG_LOG_CHNL,
-            payload_ris,
-        );
-
-        log_msg!(event_ris, ACK_MSG_LOG_CHNL);
-
-        //LOG
-
-        ris
-        //shouldn't be able to get here, but just in case...
-        //None
+        _explorer_id: ID,
+    ) {
+        todo!()
     }
 
-    fn start(&mut self, state: &PlanetState) {
+    fn on_explorer_departure(
+        &mut self,
+        _state: &mut PlanetState,
+        _generator: &Generator,
+        _combinator: &Combinator,
+        _explorer_id: ID,
+    ) {
+        todo!()
+    }
+
+    fn on_start(&mut self, state: &PlanetState, _generator: &Generator, _combinator: &Combinator) {
         //println!("Planet {} AI started", state.id());
         let mut payload = Payload::new();
         payload.insert("Message".to_string(), "Planet AI start".to_string());
         let event = LogEvent::new(
-            ActorType::Orchestrator,
-            0u64,
-            ActorType::Planet,
-            state.id().to_string(),
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            Some(Participant::new(ActorType::Planet, state.id())),
             MessageOrchestratorToPlanet,
             RCV_MSG_LOG_CHNL,
             payload,
@@ -1141,14 +1021,12 @@ impl PlanetAI for OneMillionCrabs {
         log_msg!(event, RCV_MSG_LOG_CHNL);
     }
 
-    fn stop(&mut self, _state: &PlanetState) {
+    fn on_stop(&mut self, state: &PlanetState, _generator: &Generator, _combinator: &Combinator) {
         let mut payload = Payload::new();
         payload.insert("Message".to_string(), "Planet AI stop".to_string());
         let event = LogEvent::new(
-            ActorType::Orchestrator,
-            0u64,
-            ActorType::Planet,
-            _state.id().to_string(),
+            Some(Participant::new(ActorType::Orchestrator, 0u32)),
+            Some(Participant::new(ActorType::Planet, state.id())),
             MessageOrchestratorToPlanet,
             RCV_MSG_LOG_CHNL,
             payload,
@@ -1229,6 +1107,7 @@ pub const N_CELLS: usize = 5;
 /// Provides O(1) lookups, charges and discharges.
 mod stacks {
     use crate::N_CELLS;
+    use crate::planet::Participant;
     use crate::planet::{DEBUG_LOG_CHNL, ERR_LOG_CHNL, TRACE_LOG_CHNL, WARN_LOG_CHNL};
     use common_game::logging::{ActorType, Channel, EventType, LogEvent, Payload};
     use std::sync::Mutex;
@@ -1239,7 +1118,7 @@ mod stacks {
     /// Initializes the internal vectors used to handle the stack.
     /// MUST be called everytime the planet is created, for example at
     /// the start of PlanetAI.
-    pub fn initialize_free_cell_stack(planet_id: u64) {
+    pub fn initialize_free_cell_stack(planet_id: u32) {
         //initialize the free cell stack with all the possible indexes
 
         //LOG
@@ -1314,7 +1193,7 @@ mod stacks {
     /// Pulls out a free cell from the corresponding stack.
     /// returns Some and the correspnding index to charge
     /// or None if there are no available cells
-    pub fn get_free_cell_index(planet_id: u64) -> Option<u32> {
+    pub fn get_free_cell_index(planet_id: u32) -> Option<u32> {
         let free_cell_stack = FREE_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
@@ -1368,7 +1247,7 @@ mod stacks {
     /// Pulls out a charged cell from the corresponding stack.
     /// returns Some and the correspnding index to discharge
     /// or None if there are no available cells
-    pub fn get_charged_cell_index(planet_id: u64) -> Option<u32> {
+    pub fn get_charged_cell_index(planet_id: u32) -> Option<u32> {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
@@ -1423,7 +1302,7 @@ mod stacks {
     /// The user must verify that there is available space,
     /// as the function will otherwise give no output without
     /// increasing the available space.
-    pub fn push_free_cell(index: u32, planet_id: u64) {
+    pub fn push_free_cell(index: u32, planet_id: u32) {
         //LOG
         create_internal_log_msg!(
             planet_id,
@@ -1488,7 +1367,7 @@ mod stacks {
     /// The user must verify that the maximum size hasn't already
     /// been reached, as the function will otherwise give
     /// no output without increasing the available space.
-    pub fn push_charged_cell(index: u32, planet_id: u64) {
+    pub fn push_charged_cell(index: u32, planet_id: u32) {
         //LOG
         create_internal_log_msg!(
             planet_id,
@@ -1560,7 +1439,7 @@ mod stacks {
     /// Returns Some and the corresponding index or
     /// None if there are no charged cells.
     #[allow(dead_code)]
-    pub fn peek_charged_cell_index(planet_id: u64) -> Option<u32> {
+    pub fn peek_charged_cell_index(planet_id: u32) -> Option<u32> {
         let charged_cell_stack = CHARGED_CELL_STACK.lock();
         //LOG
         create_internal_log_msg!(
