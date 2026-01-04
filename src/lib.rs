@@ -4,9 +4,8 @@ use planet::*;
 #[cfg(test)]
 mod tests {
     use crate::create_planet;
-    use common_game::protocols::messages::{
-        ExplorerToPlanet, OrchestratorToPlanet, PlanetToExplorer, PlanetToOrchestrator,
-    };
+    use common_game::protocols::orchestrator_planet::{OrchestratorToPlanet, PlanetToOrchestrator};
+    use common_game::protocols::planet_explorer::{ExplorerToPlanet, PlanetToExplorer};
     use crossbeam_channel::{Receiver, Sender, unbounded};
 
     #[test]
